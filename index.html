@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Визуализатор сортировок</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #0d1117; color: #e6edf3;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    overflow: hidden;
+  }
+  #app { display: flex; flex-direction: column; height: 100%; }
+
+  header {
+    padding: 10px 14px 8px;
+    border-bottom: 1px solid #1f2733;
+    background: linear-gradient(180deg, #131a24, #0d1117);
+    flex: 0 0 auto;
+  }
+  h1 {
+    margin: 0 0 8px; font-size: 16px; font-weight: 700; letter-spacing: .3px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  h1 span.dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: #2ecc71; box-shadow: 0 0 10px #2ecc71;
+  }
+  h1 small { font-weight: 400; color: #7d8896; font-size: 11px; margin-left: auto; }
+
+  .panel { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+  select, button {
+    font: inherit; font-size: 13px; color: #e6edf3;
+    background: #1b2430; border: 1px solid #2b3644; border-radius: 9px;
+    padding: 7px 11px; cursor: pointer; transition: .15s;
+  }
+  select { padding-right: 26px; }
+  button:hover, select:hover { background: #24303e; border-color: #3a4757; }
+  button:active { transform: scale(.97); }
+  button.primary { background: #1f6feb; border-color: #2f7ff5; font-weight: 600; }
+  button.primary:hover { background: #2a7bf5; }
+  button.primary.paused { background: #d29922; border-color: #e0a92e; color: #1a1a1a; }
+  button.danger { background: #2a1c1f; border-color: #4a2b30; }
+  button.danger:hover { background: #3a2226; }
+
+  .slider { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #9aa7b4; }
+  .slider input[type=range] {
+    -webkit-appearance: none; appearance: none;
+    width: 92px; height: 4px; border-radius: 3px; background: #2b3644; outline: none;
+  }
+  .slider input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 15px; height: 15px; border-radius: 50%;
+    background: #1f6feb; cursor: pointer; border: 2px solid #0d1117;
+  }
+  .slider input[type=range]::-moz-range-thumb {
+    width: 13px; height: 13px; border-radius: 50%; background: #1f6feb;
+    cursor: pointer; border: 2px solid #0d1117;
+  }
+  .slider b { color: #e6edf3; min-width: 26px; text-align: right; font-weight: 600; }
+
+  #stage { flex: 1 1 auto; position: relative; min-height: 0; }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  footer {
+    flex: 0 0 auto; padding: 7px 14px;
+    border-top: 1px solid #1f2733; background: #10161f;
+    display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+    font-size: 12px; color: #8b98a6;
+  }
+  footer b { color: #e6edf3; font-weight: 600; }
+  .legend { display: flex; gap: 12px; margin-left: auto; }
+  .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+  .lg-cmp { background: #ff4d4d; }
+  .lg-sort { background: #2ecc71; }
+  .lg-idle { background: #4aa8d8; }
+
+  @media (max-width: 560px) {
+    h1 { font-size: 14px; }
+    h1 small { display: none; }
+    .slider input[type=range] { width: 70px; }
+    footer { font-size: 11px; gap: 10px; }
+    .legend { display: none; }
+    select, button { font-size: 12px; padding: 6px 9px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <h1><span class="dot"></span>Визуализатор сортировок <small>6 алгоритмов · canvas</small></h1>
+    <div class="panel">
+      <select id="algo">
+        <option value="bubble">Пузырьковая</option>
+        <option value="selection">Выбором</option>
+        <option value="insertion">Вставками</option>
+        <option value="quick" selected>Быстрая</option>
+        <option value="merge">Слиянием</option>
+        <option value="heap">Кучей</option>
+      </select>
+
+      <button id="start" class="primary">▶ Старт</button>
+      <button id="newArr">🔄 Новый массив</button>
+      <button id="reset" class="danger">⏹ Сброс</button>
+
+      <label class="slider">Размер <input id="size" type="range" min="10" max="200" value="60"><b id="sizeV">60</b></label>
+      <label class="slider">Скорость <input id="speed" type="range" min="1" max="100" value="30"><b id="speedV">30</b></label>
+    </div>
+  </header>
+
+  <div id="stage"><canvas id="cvs"></canvas></div>
+
+  <footer>
+    <span>Шагов: <b id="steps">0</b></span>
+    <span>Время: <b id="time">0.00 с</b></span>
+    <span>Статус: <b id="status">готов</b></span>
+    <span class="legend">
+      <span><i class="lg-idle"></i>элемент</span>
+      <span><i class="lg-cmp"></i>сравнение</span>
+      <span><i class="lg-sort"></i>на месте</span>
+    </span>
+  </footer>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var cvs   = document.getElementById('cvs');
+  var ctx   = cvs.getContext('2d');
+  var stage = document.getElementById('stage');
+
+  var elAlgo   = document.getElementById('algo');
+  var elStart  = document.getElementById('start');
+  var elNew    = document.getElementById('newArr');
+  var elReset  = document.getElementById('reset');
+  var elSize   = document.getElementById('size');
+  var elSizeV  = document.getElementById('sizeV');
+  var elSpeed  = document.getElementById('speed');
+  var elSpeedV = document.getElementById('speedV');
+  var elSteps  = document.getElementById('steps');
+  var elTime   = document.getElementById('time');
+  var elStatus = document.getElementById('status');
+
+  var arr = [];          // текущий массив
+  var base = [];         // исходный массив (для сброса)
+  var sortedFlags = [];  // 1 = элемент на своём месте
+  var cmp = [];          // индексы сравниваемых элементов
+  var maxVal = 1;
+
+  var gen = null;        // генератор шагов алгоритма
+  var running = false;
+  var rafId = null;
+  var steps = 0;
+  var t0 = 0;
+  var elapsed = 0;
+  var finished = false;
+
+  /* ---------- АЛГОРИТМЫ (генераторы шагов) ---------- */
+
+  function* bubbleSort(a) {
+    var n = a.length, i, j, t, swapped;
+    for (i = 0; i < n - 1; i++) {
+      swapped = false;
+      for (j = 0; j < n - 1 - i; j++) {
+        yield { cmp: [j, j + 1] };
+        if (a[j] > a[j + 1]) {
+          t = a[j]; a[j] = a[j + 1]; a[j + 1] = t;
+          swapped = true;
+          yield { cmp: [j, j + 1] };
+        }
+      }
+      yield { sorted: [n - 1 - i] };
+      if (!swapped) {
+        for (var k = 0; k < n - 1 - i; k++) yield { sorted: [k] };
+        return;
+      }
+    }
+    yield { sorted: [0] };
+  }
+
+  function* selectionSort(a) {
+    var n = a.length, i, j, m, t;
+    for (i = 0; i < n; i++) {
+      m = i;
+      for (j = i + 1; j < n; j++) {
+        yield { cmp: [m, j] };
+        if (a[j] < a[m]) m = j;
+      }
+      if (m !== i) {
+        t = a[i]; a[i] = a[m]; a[m] = t;
+        yield { cmp: [i, m] };
+      }
+      yield { sorted: [i] };
+    }
+  }
+
+  function* insertionSort(a) {
+    var n = a.length, i, j, key;
+    if (n) yield { sorted: [0] };
+    for (i = 1; i < n; i++) {
+      key = a[i];
+      j = i - 1;
+      while (j >= 0) {
+        yield { cmp: [j, i] };
+        if (a[j] > key) {
+          a[j + 1] = a[j];
+          j--;
+          yield { cmp: [j + 1] };
+        } else break;
+      }
+      a[j + 1] = key;
+      yield { sorted: [i] };
+    }
+  }
+
+  function* quickSort(a) {
+    var n = a.length, t;
+    var stack = [[0, n - 1]];
+    while (stack.length) {
+      var seg = stack.pop();
+      var lo = seg[0], hi = seg[1];
+      if (lo > hi) continue;
+      if (lo === hi) { yield { sorted: [lo] }; continue; }
+
+      var pivot = a[hi], i = lo, j;
+      for (j = lo; j < hi; j++) {
+        yield { cmp: [j, hi] };
+        if (a[j] < pivot) {
+          t = a[i]; a[i] = a[j]; a[j] = t;
+          i++;
+        }
+      }
+      t = a[i]; a[i] = a[hi]; a[hi] = t;
+      yield { cmp: [i, hi], sorted: [i] };
+
+      stack.push([lo, i - 1]);
+      stack.push([i + 1, hi]);
+    }
+  }
+
+  function* mergeSort(a) {
+    var n = a.length;
+    var tmp = new Array(n);
+
+    function* ms(lo, hi) {
+      if (hi - lo < 1) return;
+      var mid = (lo + hi) >> 1;
+      yield* ms(lo, mid);
+      yield* ms(mid + 1, hi);
+
+      var i = lo, j = mid + 1, k = lo;
+      while (i <= mid && j <= hi) {
+        yield { cmp: [i, j] };
+        if (a[i] <= a[j]) tmp[k++] = a[i++];
+        else tmp[k++] = a[j++];
+      }
+      while (i <= mid) tmp[k++] = a[i++];
+      while (j <= hi) tmp[k++] = a[j++];
+
+      for (var x = lo; x <= hi; x++) {
+        a[x] = tmp[x];
+        yield { cmp: [x] };
+      }
+      if (lo === 0 && hi === n - 1) {
+        for (var y = 0; y < n; y++) yield { sorted: [y] };
+      }
+    }
+
+    yield* ms(0, n - 1);
+  }
+
+  function* heapSort(a) {
+    var n = a.length, t;
+
+    function* sift(start, end) {
+      var root = start, child;
+      while (root * 2 + 1 <= end) {
+        child = root * 2 + 1;
+        if (child + 1 <= end) {
+          yield { cmp: [child, child + 1] };
+          if (a[child] < a[child + 1]) child++;
+        }
+        yield { cmp: [root, child] };
+        if (a[root] < a[child]) {
+          t = a[root]; a[root] = a[child]; a[child] = t;
+          root = child;
+        } else return;
+      }
+    }
+
+    for (var s = (n >> 1) - 1; s >= 0; s--) yield* sift(s, n - 1);
+
+    for (var e = n - 1; e > 0; e--) {
+      t = a[0]; a[0] = a[e]; a[e] = t;
+      yield { cmp: [0, e], sorted: [e] };
+      yield* sift(0, e - 1);
+    }
+    if (n) yield { sorted: [0] };
+  }
+
+  var ALGOS = {
+    bubble:    { name: 'Пузырьковая', fn: bubbleSort },
+    selection: { name: 'Выбором',     fn: selectionSort },
+    insertion: { name: 'Вставками',   fn: insertionSort },
+    quick:     { name: 'Быстрая',     fn: quickSort },
+    merge:     { name: 'Слиянием',    fn: mergeSort },
+    heap:      { name: 'Кучей',       fn: heapSort }
+  };
+
+  /* ---------- РАЗМЕР CANVAS ---------- */
+
+  function fitCanvas() {
+    var dpr = window.devicePixelRatio || 1;
+    var w = stage.clientWidth || 300;
+    var h = stage.clientHeight || 200;
+    cvs.width  = Math.max(1, Math.floor(w * dpr));
+    cvs.height = Math.max(1, Math.floor(h * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+
+  /* ---------- ОТРИСОВКА ---------- */
+
+  function draw() {
+    var w = stage.clientWidth || 300;
+    var h = stage.clientHeight || 200;
+    ctx.clearRect(0, 0, w, h);
+
+    var n = arr.length;
+    if (!n) return;
+
+    var gap = n > 130 ? 0 : (n > 70 ? 1 : 2);
+    var bw = (w - gap * (n - 1)) / n;
+    if (bw < 1) { bw = w / n; gap = 0; }
+    var pad = 8;
+    var usable = h - pad;
+
+    for (var i = 0; i < n; i++) {
+      var ratio = arr[i] / maxVal;
+      var bh = Math.max(2, ratio * usable);
+      var x = i * (bw + gap);
+      var y = h - bh;
+
+      var color;
+      if (cmp.indexOf(i) !== -1) {
+        color = '#ff4d4d';
+      } else if (sortedFlags[i]) {
+        color = '#2ecc71';
+      } else {
+        var hue = 190 + 130 * ratio;
+        var light = 42 + 18 * ratio;
+        color = 'hsl(' + hue.toFixed(0) + ', 82%, ' + light.toFixed(0) + '%)';
+      }
+
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y, Math.max(1, bw), bh);
+    }
+  }
+
+  /* ---------- СОСТОЯНИЕ ---------- */
+
+  function newArray() {
+    stopLoop();
+    var n = parseInt(elSize.value, 10);
+    arr = new Array(n);
+    for (var i = 0; i < n; i++) arr[i] = Math.floor(Math.random() * 100) + 1;
+    base = arr.slice();
+    maxVal = 100;
+    resetRun();
+    elStatus.textContent = 'готов';
+    draw();
+  }
+
+  function resetRun() {
+    stopLoop();
+    sortedFlags = new Array(arr.length);
+    for (var i = 0; i < arr.length; i++) sortedFlags[i] = 0;
+    cmp = [];
+    gen = null;
+    running = false;
+    finished = false;
+    steps = 0;
+    elapsed = 0;
+    t0 = 0;
+    elSteps.textContent = '0';
+    elTime.textContent = '0.00 с';
+    elStart.textContent = '▶ Старт';
+    elStart.classList.remove('paused');
+  }
+
+  function restoreArray() {
+    stopLoop();
+    arr = base.slice();
+    resetRun();
+    elStatus.textContent = 'готов';
+    draw();
+  }
+
+  function stopLoop() {
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+  }
+
+  function stepsPerFrame() {
+    var s = parseInt(elSpeed.value, 10);
+    return 1 + (s - 1) * 4;
+  }
+
+  /* ---------- ЦИКЛ ВЫПОЛНЕНИЯ ---------- */
+
+  function tick() {
+    if (!running) return;
+
+    var spf = stepsPerFrame();
+    var done = false;
+
+    for (var k = 0; k < spf; k++) {
+      var r = gen.next();
+      if (r.done) { done = true; break; }
+      steps++;
+      var st = r.value || {};
+      cmp = st.cmp ? st.cmp : [];
+      if (st.sorted) {
+        for (var q = 0; q < st.sorted.length; q++) sortedFlags[st.sorted[q]] = 1;
+      }
+    }
+
+    elapsed = (performance.now() - t0) / 1000;
+    elSteps.textContent = steps;
+    elTime.textContent = elapsed.toFixed(2) + ' с';
+
+    if (done) {
+      finish();
+      return;
+    }
+
+    draw();
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function finish() {
+    running = false;
+    finished = true;
+    stopLoop();
+    cmp = [];
+    for (var i = 0; i < arr.length; i++) sortedFlags[i] = 1;
+    elStart.textContent = '▶ Старт';
+    elStart.classList.remove('paused');
+    elStatus.textContent = 'готово ✓';
+    draw();
+  }
+
+  function toggleRun() {
+    if (finished) { restoreArray(); }
+
+    if (running) {
+      running = false;
+      stopLoop();
+      elStart.textContent = '▶ Старт';
+      elStart.classList.remove('paused');
+      elStatus.textContent = 'пауза';
+      return;
+    }
+
+    if (!gen) {
+      gen = ALGOS[elAlgo.value].fn(arr);
+      t0 = performance.now() - elapsed * 1000;
+      elStatus.textContent = ALGOS[elAlgo.value].name + '…';
+    } else {
+      t0 = performance.now() - elapsed * 1000;
+      elStatus.textContent = ALGOS[elAlgo.value].name + '…';
+    }
+
+    running = true;
+    elStart.textContent = '⏸ Пауза';
+    elStart.classList.add('paused');
+    rafId = requestAnimationFrame(tick);
+  }
+
+  /* ---------- СОБЫТИЯ ---------- */
+
+  elStart.addEventListener('click', toggleRun);
+  elNew.addEventListener('click', newArray);
+  elReset.addEventListener('click', restoreArray);
+
+  elAlgo.addEventListener('change', function () {
+    restoreArray();
+    elStatus.textContent = 'готов';
+  });
+
+  elSize.addEventListener('input', function () {
+    elSizeV.textContent = elSize.value;
+    newArray();
+  });
+
+  elSpeed.addEventListener('input', function () {
+    elSpeedV.textContent = elSpeed.value;
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    if (e.code === 'Space') { e.preventDefault(); toggleRun(); }
+    if (e.key === 'r' || e.key === 'R' || e.key === 'к' || e.key === 'К') newArray();
+  });
+
+  window.addEventListener('resize', fitCanvas);
+  window.addEventListener('orientationchange', function () { setTimeout(fitCanvas, 150); });
+
+  /* ---------- СТАРТ ---------- */
+
+  elSizeV.textContent = elSize.value;
+  elSpeedV.textContent = elSpeed.value;
+  newArray();
+  fitCanvas();
+})();
+</script>
+</body>
+</html>
