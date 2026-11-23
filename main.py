@@ -288,6 +288,9 @@ class SortVisualizer:
         self.update_stats()
 
     def _size_changed(self, _=None):
+        # защита от раннего вызова: слайдер дёргает команду ещё до сборки кнопок
+        if not hasattr(self, "btn_run"):
+            return
         if self.size_var.get() != len(self.values):
             self.new_array()
 
